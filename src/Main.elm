@@ -1,49 +1,81 @@
 module Main exposing (main)
 
 import Browser
-import Html exposing (Html, text, button, div, textarea)
-import Html.Attributes as Attributes exposing (class)
-import Html.Events as Events
-
+import Html exposing (Html, button, code, div, pre, text)
+import Html.Events exposing (onClick)
+import Random exposing ( Generator)
 
 type alias Model =
-      { text : String }
+      Expr
 
 
-autoTextarea { text, onInput, placeholder } =
-    div [ Attributes.class "autoexpand" ]
-        [ textarea [Events.onInput onInput,Attributes.placeholder placeholder ]  [Html.text text]
-        , div []  [Html.text (text ++ "_")]
-        ]
+type Expr
+    = Integer Int
+    | Add Expr Expr
+    | Multiply Expr Expr
 
-
-initialModel : Model
-initialModel =
-        { text = "" }
 
 
 type Msg
-    = SetText String
-
-
-update : Msg -> Model -> Model
-update msg model =
-      case msg of
-        SetText text ->
-            { model | text=text }
-
-
-view : Model -> Html Msg
-view  model =
-    div []
-    [autoTextarea { text = model.text, onInput = SetText, placeholder = "write something"}
-    ]
+    = NewExpr Expr
+    | GetNewExpr
 
 
 main : Program () Model Msg
 main =
-    Browser.sandbox
-      { init = initialModel
+    Browser.element
+      { init = always ( Integer 0, Cmd.none )
       , view = view
       , update = update
+      , subscriptions = always Sub.none
       }
+
+
+view : Expr -> Html Msg
+view expr =
+    div []
+        [button [onClick GetNewExpr ][ text "New Expression" ]
+        , code []
+            [ pre []  [ text <| Debug.toString expr ]
+            ]
+        ]
+
+
+update : Msg -> Model -> (Model, Cmd Msg )
+update msg model =
+    case msg of
+        GetNewExpr ->
+            ( model, Random.generate NewExpr expression )
+
+        NewExpr expr ->
+            ( expr, Cmd.none )
+
+
+
+
+
+
+expression : Generator Expr
+expression =
+    Random.weighted (50, integer ) [  (25, addition ), (25, multiplication ) ]
+        |> Random.andThen identity
+
+
+integer : Generator Expr
+integer =
+    Random.int 1 100
+        |> Random.map Integer
+
+
+addition : Generator Expr
+addition =
+    Random.map2 Add
+        (Random.lazy (\_ -> expression))
+        (Random.lazy (\_ -> expression))
+
+
+multiplication : Generator Expr
+multiplication =
+      Random.map2 Multiply
+          (Random.lazy ( \_ -> expression ))
+          (Random.lazy (\_ -> expression ))
